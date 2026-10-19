@@ -358,23 +358,29 @@
 
         // Auth Operations
         function handleRegister(e) {
-            e.preventDefault();
-            const name = document.getElementById('regName').value.trim();
-            const studentId = document.getElementById('regStudentId').value.trim();
+    e.preventDefault();
+    const name = document.getElementById('regName').value.trim();
+    const studentId = document.getElementById('regStudentId').value.trim();
 
-            db.ref('users/' + studentId).once('value', (snapshot) => {
-                if (snapshot.exists()) {
-                    alert('이미 등록된 학번입니다. 로그인해 주세요.');
-                } else {
-                    db.ref('users/' + studentId).set({ name, studentId });
-                    currentUser = { name, studentId };
-                    localStorage.setItem('studycafe_user', JSON.stringify(currentUser));
-                    closeModal('authModal');
-                    renderAuthHeader();
-                    alert('회원가입이 완료되었습니다!');
-                }
-            });
+    // 10자리 학번 유효성 검사 추가
+    if (studentId.length !== 10 || isNaN(studentId)) {
+        alert('학번은 숫자 10자리로 입력해 주세요.');
+        return;
+    }
+
+    db.ref('users/' + studentId).once('value', (snapshot) => {
+        if (snapshot.exists()) {
+            alert('이미 등록된 학번입니다. 로그인해 주세요.');
+        } else {
+            db.ref('users/' + studentId).set({ name, studentId });
+            currentUser = { name, studentId };
+            localStorage.setItem('studycafe_user', JSON.stringify(currentUser));
+            closeModal('authModal');
+            renderAuthHeader();
+            alert('회원가입이 완료되었습니다!');
         }
+    });
+}
 
         function handleLogin(e) {
             e.preventDefault();
