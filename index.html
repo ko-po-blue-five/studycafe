@@ -324,13 +324,42 @@
                 return;
             }
 
-            db.ref('seats/' + seatId).update({
-                status: 'OCCUPIED',
-                userName: currentUser.name,
-                studentId: currentUser.studentId,
-                checkInTime: Date.now(),
-                breakStartTime: null,
-                breakDurationMinutes: 30
+            // 전체 좌석 정보를 한 번 불러와서 검사
+            db.ref('seats').once('value', (snapshot) => {
+                const seats = snapshot.val();
+                if (!seats) return;
+
+                // 1. 선택한 좌석이 그사이 다른 사람에 의해 예약되었는지 확인 (동시 접속 방어)
+                if (seats[seatId].status !== 'AVAILABLE') {
+                    alert("이미 이용 중인 좌석입니다.");
+                    return;
+                }
+
+                // 2. 현재 사용자가 이미 이용 중인 좌석이 있는지 확인 (1인 1좌석 검사)
+                let alreadyHasSeat = false;
+                let occupiedSeatId = null;
+
+                Object.values(seats).forEach(seat => {
+                    if ((seat.status === 'OCCUPIED' || seat.status === 'BREAK') && seat.studentId === currentUser.studentId) {
+                        alreadyHasSeat = true;
+                        occupiedSeatId = seat.id;
+                    }
+                });
+
+                if (alreadyHasSeat) {
+                    alert(`이미 ${occupiedSeatId}번 좌석을 이용 중입니다.\n1인당 1개의 좌석만 이용할 수 있습니다.`);
+                    return; // 예약 중단
+                }
+
+                // 3. 검사를 모두 통과했다면 입실 처리
+                db.ref('seats/' + seatId).update({
+                    status: 'OCCUPIED',
+                    userName: currentUser.name,
+                    studentId: currentUser.studentId,
+                    checkInTime: Date.now(),
+                    breakStartTime: null,
+                    breakDurationMinutes: 30
+                });
             });
         }
 
