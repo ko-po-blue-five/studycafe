@@ -135,7 +135,7 @@
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-slate-600 mb-1">학번</label>
-                    <input type="text" id="regStudentId" required placeholder="예: 20261234" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <input type="text" id="regStudentId" required placeholder="예: 2026123456" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
                 </div>
                 <button type="submit" class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition">회원가입 완료</button>
             </form>
@@ -441,7 +441,7 @@
         function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
 
         function maskName(name) { return name ? name[0] + "*" + (name.length > 2 ? name[name.length-1] : "") : ""; }
-        function maskId(id) { return id ? id.substring(0, 4) + "****" : ""; }
+        function maskId(id) { return id ? id.substring(0, 4) + "******" : ""; }
     </script>
 </body>
 </html>
