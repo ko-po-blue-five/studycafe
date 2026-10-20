@@ -24,7 +24,7 @@
             </div>
             
             <div class="flex items-center space-x-3 text-sm">
-                <button onclick="openAdminModal()" class="px-3 py-1 bg-indigo-800 hover:bg-indigo-700 text-amber-300 font-bold rounded-lg text-xs border border-indigo-700">
+                <button onclick="openAdminModal()" class="px-3 py-1 bg-indigo-800 hover:bg-indigo-700 text-amber-300 font-bold rounded-lg text-xs border border-indigo-700 transition">
                     <i class="fa-solid fa-user-shield"></i> 관리자 로그
                 </button>
                 <div id="authHeader" class="flex items-center space-x-3 text-sm">
@@ -162,14 +162,13 @@
                 <p class="text-xs text-slate-500">관리자 전용 비밀번호를 입력해 주세요.</p>
                 <div class="flex gap-2">
                     <input type="password" id="adminPw" placeholder="비밀번호 입력" class="flex-1 px-3 py-2 border rounded-lg text-sm">
-                    <button onclick="verifyAdmin()" class="px-4 py-2 bg-indigo-600 text-white font-bold rounded-lg text-sm">확인</button>
+                    <button onclick="verifyAdmin()" class="px-4 py-2 bg-indigo-600 text-white font-bold rounded-lg text-sm transition">확인</button>
                 </div>
             </div>
 
-            <!-- Admin Content Area (Hidden until authenticated) -->
+            <!-- Admin Content Area -->
             <div id="adminContent" class="hidden flex-1 overflow-y-auto space-y-6">
-                
-                <!-- Section 1: Active Seats Management (Force Checkout) -->
+                <!-- Section 1: Active Seats Management -->
                 <div>
                     <h4 class="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
                         <i class="fa-solid fa-list-check text-indigo-500"></i> 현재 이용중인 좌석 관리
@@ -207,7 +206,7 @@
                                     <th class="p-2.5">시간</th>
                                 </tr>
                             </thead>
-                            <tbody id="logTableBody" class="divide-y divide-slate-100">
+                            <tbody id="logTableBody" class="divide-y divide-slate-100 bg-white">
                                 <!-- Dynamic Logs -->
                             </tbody>
                         </table>
@@ -217,8 +216,91 @@
         </div>
     </div>
 
-    <!-- Firebase Script Logic -->
+    <!-- Custom Alert UI (Replaces default window.alert) -->
+    <div id="customAlertModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm hidden flex items-center justify-center p-4 z-[70] transition-opacity">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center space-y-4 animate-[scale-up_0.2s_ease-out]">
+            <div id="customAlertIcon" class="text-5xl text-indigo-500 mb-3"><i class="fa-solid fa-bell"></i></div>
+            <p id="customAlertMessage" class="text-sm font-bold text-slate-700 break-words whitespace-pre-wrap leading-relaxed"></p>
+            <button onclick="closeCustomAlert()" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition shadow-md">확인</button>
+        </div>
+    </div>
+
+    <!-- Custom Confirm UI (Replaces default window.confirm) -->
+    <div id="customConfirmModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm hidden flex items-center justify-center p-4 z-[70] transition-opacity">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center space-y-4 animate-[scale-up_0.2s_ease-out]">
+            <div class="text-5xl text-amber-500 mb-3"><i class="fa-solid fa-circle-question"></i></div>
+            <p id="customConfirmMessage" class="text-sm font-bold text-slate-700 break-words whitespace-pre-wrap leading-relaxed"></p>
+            <div class="flex gap-3 mt-4">
+                <button onclick="closeCustomConfirm(false)" class="flex-1 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl transition">취소</button>
+                <button onclick="closeCustomConfirm(true)" class="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition shadow-md">확인</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Prompt UI (Replaces default window.prompt) -->
+    <div id="customPromptModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm hidden flex items-center justify-center p-4 z-[70] transition-opacity">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center space-y-4 animate-[scale-up_0.2s_ease-out]">
+            <div class="text-5xl text-amber-500 mb-3"><i class="fa-solid fa-clock"></i></div>
+            <p id="customPromptMessage" class="text-sm font-bold text-slate-700 break-words whitespace-pre-wrap"></p>
+            <input type="number" id="customPromptInput" class="w-full px-3 py-3 border border-slate-300 rounded-xl text-center font-bold text-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" value="30">
+            <div class="flex gap-3 mt-4">
+                <button onclick="closeCustomPrompt(false)" class="flex-1 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl transition">취소</button>
+                <button onclick="closeCustomPrompt(true)" class="flex-1 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl transition shadow-md">확인</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Animation Keyframes -->
+    <style>
+        @keyframes scale-up {
+            0% { transform: scale(0.9); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+    </style>
+
     <script>
+        // Custom UI Alert, Confirm, Prompt Logic
+        let confirmCallback = null;
+        let promptCallback = null;
+
+        function customAlert(message) {
+            document.getElementById('customAlertMessage').innerText = message;
+            document.getElementById('customAlertModal').classList.remove('hidden');
+        }
+
+        function closeCustomAlert() {
+            document.getElementById('customAlertModal').classList.add('hidden');
+        }
+
+        function customConfirm(message, callback) {
+            document.getElementById('customConfirmMessage').innerText = message;
+            confirmCallback = callback;
+            document.getElementById('customConfirmModal').classList.remove('hidden');
+        }
+
+        function closeCustomConfirm(result) {
+            document.getElementById('customConfirmModal').classList.add('hidden');
+            if (result && confirmCallback) confirmCallback();
+            confirmCallback = null;
+        }
+
+        function customPrompt(message, defaultValue, callback) {
+            document.getElementById('customPromptMessage').innerText = message;
+            document.getElementById('customPromptInput').value = defaultValue;
+            promptCallback = callback;
+            document.getElementById('customPromptModal').classList.remove('hidden');
+            setTimeout(() => document.getElementById('customPromptInput').focus(), 100);
+        }
+
+        function closeCustomPrompt(result) {
+            document.getElementById('customPromptModal').classList.add('hidden');
+            if (result && promptCallback) {
+                promptCallback(document.getElementById('customPromptInput').value);
+            }
+            promptCallback = null;
+        }
+
+        // Firebase Initialization
         const firebaseConfig = {
             apiKey: "AIzaSyBNKlVehkC6GODaSJiVUerCbVxFGMBAIUU",
             authDomain: "studycafe-453d3.firebaseapp.com",
@@ -240,19 +322,19 @@
             initSeatsInDB();
             renderAuthHeader();
             listenToDB();
-            listenToNotifications(); // 추가: 알림 감지 리스너 실행
+            listenToNotifications(); 
             setInterval(checkAllBreakTimers, 1000);
             setInterval(checkAuthTimeout, 1000);
         });
 
-        // 사용자별 개별 알림을 감지하는 함수
         function listenToNotifications() {
             if (!currentUser) return;
             db.ref('notifications/' + currentUser.studentId).on('child_added', (snapshot) => {
                 const notif = snapshot.val();
                 if (notif && notif.message) {
-                    alert(notif.message);
-                    snapshot.ref.remove(); // 알림 확인 후 즉시 DB에서 삭제하여 반복 방지
+                    // 강제 퇴실 또는 알림 발생 시 모달로 사용자에게 확실히 인지시킴
+                    customAlert(notif.message);
+                    snapshot.ref.remove(); // 알림 확인 후 즉시 DB에서 삭제하여 중복 알림 방지
                 }
             });
         }
@@ -294,42 +376,42 @@
 
             Object.values(seats).forEach(seat => {
                 const card = document.createElement('div');
-                card.className = "p-4 rounded-xl border transition flex flex-col justify-between h-48 shadow-sm relative ";
+                card.className = "p-4 rounded-xl border transition flex flex-col justify-between h-48 shadow-sm relative overflow-hidden ";
 
                 if (seat.status === 'AVAILABLE') {
-                    card.className += "bg-white border-slate-200 hover:border-indigo-400";
+                    card.className += "bg-white border-slate-200 hover:border-indigo-400 hover:shadow-md cursor-pointer";
                     card.innerHTML = `
-                        <div class="flex justify-between items-center">
+                        <div class="flex justify-between items-center" onclick="handleSeatClick(${seat.id})">
                             <span class="font-bold text-slate-700 text-lg">${seat.id}번 좌석</span>
-                            <span class="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">이용가능</span>
+                            <span class="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-bold">이용가능</span>
                         </div>
-                        <div class="text-center py-1 text-slate-300">
-                            <i class="fa-solid fa-chair text-3xl"></i>
+                        <div class="text-center py-1 text-slate-300" onclick="handleSeatClick(${seat.id})">
+                            <i class="fa-solid fa-chair text-4xl mt-2 transition-transform hover:scale-110"></i>
                         </div>
-                        <div class="space-y-1">
-                            <button onclick="handleSeatClick(${seat.id})" class="w-full py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 font-bold rounded-lg text-xs">입실하기</button>
-                            ${seat.lastUser ? `<button onclick="reportUnclean(${seat.id})" class="w-full py-1 bg-slate-100 hover:bg-rose-50 text-rose-500 font-medium rounded-lg text-[10px]">⚠️ 전 이용자 청결 신고</button>` : ''}
+                        <div class="space-y-1 z-10 relative">
+                            <button onclick="handleSeatClick(${seat.id})" class="w-full py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 font-bold rounded-lg text-xs transition">입실하기</button>
+                            ${seat.lastUser ? `<button onclick="reportUnclean(${seat.id})" class="w-full py-1 bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-rose-400 font-medium rounded-lg text-[10px] transition">⚠️ 전 이용자 청결 신고</button>` : ''}
                         </div>
                     `;
                 } else if (seat.status === 'OCCUPIED') {
                     const isMySeat = currentUser && currentUser.studentId === seat.studentId;
-                    card.className += "bg-indigo-50/50 border-indigo-300";
+                    card.className += "bg-indigo-50/70 border-indigo-300";
                     card.innerHTML = `
                         <div class="flex justify-between items-center">
                             <span class="font-bold text-indigo-900 text-lg">${seat.id}번 좌석</span>
                             <span class="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded-full font-bold">이용중</span>
                         </div>
-                        <div class="text-xs text-indigo-900 space-y-1 my-auto">
-                            <p class="font-bold text-sm">${maskName(seat.userName)} (${maskId(seat.studentId)})</p>
-                            <p class="text-slate-500">입실: ${new Date(seat.checkInTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</p>
+                        <div class="text-xs text-indigo-900 space-y-1 my-auto bg-white/50 p-2 rounded-lg border border-indigo-100">
+                            <p class="font-bold text-sm"><i class="fa-solid fa-user-check text-indigo-500"></i> ${maskName(seat.userName)} (${maskId(seat.studentId)})</p>
+                            <p class="text-slate-500"><i class="fa-solid fa-right-to-bracket"></i> 입실: ${new Date(seat.checkInTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</p>
                         </div>
                         ${isMySeat ? `
-                            <div class="grid grid-cols-2 gap-1.5">
-                                <button onclick="startBreak(${seat.id})" class="py-1.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-lg text-xs">외출</button>
-                                <button onclick="checkOut(${seat.id})" class="py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg text-xs">퇴실</button>
+                            <div class="grid grid-cols-2 gap-1.5 z-10 relative mt-1">
+                                <button onclick="startBreak(${seat.id})" class="py-1.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-lg text-xs shadow-sm transition">외출</button>
+                                <button onclick="checkOut(${seat.id})" class="py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg text-xs shadow-sm transition">퇴실</button>
                             </div>
                         ` : `
-                            <button onclick="alert('본인 좌석만 제어할 수 있습니다.')" class="w-full py-1.5 bg-slate-200 text-slate-500 font-medium rounded-lg text-xs">사용 중</button>
+                            <button onclick="customAlert('본인 좌석만 제어할 수 있습니다.')" class="w-full py-1.5 bg-slate-200 text-slate-500 font-medium rounded-lg text-xs mt-1">사용 중</button>
                         `}
                     `;
                 } else if (seat.status === 'BREAK') {
@@ -338,27 +420,26 @@
                     card.innerHTML = `
                         <div class="flex justify-between items-center">
                             <span class="font-bold text-amber-900 text-lg">${seat.id}번 좌석</span>
-                            <span class="text-xs bg-amber-500 text-white px-2 py-0.5 rounded-full font-bold animate-pulse">외출 중</span>
+                            <span class="text-[10px] bg-amber-500 text-white px-2 py-0.5 rounded-full font-bold animate-pulse">외출 중</span>
                         </div>
-                        <div class="text-xs text-amber-900 space-y-1 my-auto">
-                            <p class="font-bold">${maskName(seat.userName)}</p>
-                            <p id="breakTimer-${seat.id}" class="text-rose-600 font-bold">남은시간 계산중...</p>
+                        <div class="text-xs text-amber-900 space-y-1 my-auto bg-white/60 p-2 rounded-lg border border-amber-100 text-center">
+                            <p class="font-bold"><i class="fa-solid fa-user-clock text-amber-500"></i> ${maskName(seat.userName)}</p>
+                            <p id="breakTimer-${seat.id}" class="text-rose-600 font-bold bg-rose-50 py-0.5 rounded">남은시간 계산중...</p>
                         </div>
                         ${isMySeat ? `
-                            <button onclick="returnFromBreak(${seat.id})" class="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs">복귀하기</button>
+                            <button onclick="returnFromBreak(${seat.id})" class="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs shadow-sm transition mt-1">복귀하기</button>
                         ` : `
-                            <button onclick="alert('현재 외출 중인 좌석입니다.')" class="w-full py-2 bg-amber-200 text-amber-700 font-medium rounded-lg text-xs">부재 중</button>
+                            <button onclick="customAlert('현재 외출 중인 좌석입니다.')" class="w-full py-1.5 bg-amber-200/50 text-amber-700 font-medium rounded-lg text-xs mt-1">부재 중</button>
                         `}
                     `;
                 }
-
                 grid.appendChild(card);
             });
         }
 
         function handleSeatClick(seatId) {
             if (!currentUser) {
-                alert("로그인이 필요한 서비스입니다.");
+                customAlert("로그인이 필요한 서비스입니다.");
                 openModal('authModal');
                 return;
             }
@@ -376,7 +457,7 @@
                 }
 
                 if (alreadyUsingSeat) {
-                    alert(`이미 ${alreadyUsingSeat}번 좌석을 이용(또는 외출) 중입니다.\n1인당 1개의 좌석만 예약할 수 있습니다.`);
+                    customAlert(`이미 ${alreadyUsingSeat}번 좌석을 이용(또는 외출) 중입니다.\n1인당 1개의 좌석만 예약할 수 있습니다.`);
                     return;
                 }
 
@@ -392,13 +473,16 @@
         }
 
         function startBreak(seatId) {
-            const minutes = prompt("외출 시간을 분 단위로 입력하세요 (최대 30분):", "30");
-            if (!minutes || isNaN(minutes) || minutes <= 0) return;
+            customPrompt("외출 시간을 분 단위로 입력하세요 (최대 30분):", "30", (minutes) => {
+                if (!minutes || isNaN(minutes) || minutes <= 0) return;
+                let duration = parseInt(minutes);
+                if (duration > 30) duration = 30; // 최대 30분 제한 방어
 
-            db.ref('seats/' + seatId).update({
-                status: 'BREAK',
-                breakStartTime: Date.now(),
-                breakDurationMinutes: parseInt(minutes)
+                db.ref('seats/' + seatId).update({
+                    status: 'BREAK',
+                    breakStartTime: Date.now(),
+                    breakDurationMinutes: duration
+                });
             });
         }
 
@@ -410,7 +494,7 @@
         }
 
         function checkOut(seatId) {
-            if (confirm("퇴실하시겠습니까? (소지품과 쓰레기를 정돈해 주세요)")) {
+            customConfirm("퇴실하시겠습니까?\n(소지품과 쓰레기를 정돈해 주세요)", () => {
                 db.ref('seats/' + seatId).once('value', (snapshot) => {
                     const seat = snapshot.val();
                     if (seat && seat.userName) {
@@ -440,17 +524,17 @@
                         });
                     }
                 });
-            }
+            });
         }
 
         function reportUnclean(seatId) {
             if (!currentUser) {
-                alert("로그인 후 신고가 가능합니다.");
+                customAlert("로그인 후 신고가 가능합니다.");
                 openModal('authModal');
                 return;
             }
 
-            if (confirm("전 이용자가 좌석을 정돈하지 않고 퇴실했습니까? 신고 내역이 관리자에게 전달됩니다.")) {
+            customConfirm("전 이용자가 좌석을 정돈하지 않고 퇴실했습니까?\n신고 내역이 관리자에게 전달됩니다.", () => {
                 db.ref('seats/' + seatId).once('value', (snapshot) => {
                     const seat = snapshot.val();
                     if (seat && seat.lastUser) {
@@ -463,10 +547,10 @@
                             reporterId: currentUser.studentId,
                             time: Date.now()
                         });
-                        alert("신고가 접수되었습니다. 관리자가 내역을 확인합니다.");
+                        customAlert("신고가 접수되었습니다.\n관리자가 내역을 확인합니다.");
                     }
                 });
-            }
+            });
         }
 
         function checkAllBreakTimers() {
@@ -482,7 +566,13 @@
                         const remainingMs = allowedMs - elapsedMs;
 
                         const timerElem = document.getElementById(`breakTimer-${seat.id}`);
+                        
                         if (remainingMs <= 0) {
+                            // 외출 시간 초과 시 시스템 알림 추가 발송
+                            db.ref('notifications/' + seat.studentId).push({
+                                message: `[시스템 알림] ⏰ ${seat.id}번 좌석 외출 시간이 초과되어 자동 퇴실 처리되었습니다.\n(설정시간: ${seat.breakDurationMinutes}분)`
+                            });
+
                             db.ref('logs').push({
                                 type: 'AUTO_EXIT',
                                 seatId: seat.id,
@@ -515,7 +605,7 @@
             if (currentUser && currentUser.expireTime) {
                 if (Date.now() > currentUser.expireTime) {
                     logout();
-                    alert("로그인 유효시간(10분)이 만료되어 자동 로그아웃되었습니다.");
+                    customAlert("로그인 유효시간(10분)이 만료되어\n자동 로그아웃되었습니다.");
                 }
             }
         }
@@ -526,13 +616,13 @@
             const studentId = document.getElementById('regStudentId').value.trim();
 
             if (studentId.length !== 10 || isNaN(studentId)) {
-                alert('학번은 숫자 10자리로 입력해 주세요.');
+                customAlert('학번은 숫자 10자리로 입력해 주세요.');
                 return;
             }
 
             db.ref('users/' + studentId).once('value', (snapshot) => {
                 if (snapshot.exists()) {
-                    alert('이미 등록된 학번입니다. 로그인해 주세요.');
+                    customAlert('이미 등록된 학번입니다. 로그인해 주세요.');
                 } else {
                     db.ref('users/' + studentId).set({ name, studentId });
                     
@@ -542,8 +632,8 @@
                     
                     closeModal('authModal');
                     renderAuthHeader();
-                    listenToNotifications(); // 로그인 성공 시 알림 리스너 시작
-                    alert('회원가입이 완료되었습니다!');
+                    listenToNotifications(); 
+                    customAlert(`환영합니다! ${name}님,\n회원가입이 완료되었습니다.`);
                 }
             });
         }
@@ -562,25 +652,27 @@
                     
                     closeModal('authModal');
                     renderAuthHeader();
-                    listenToNotifications(); // 로그인 성공 시 알림 리스너 시작
+                    listenToNotifications();
                 } else {
-                    alert('이름 또는 학번 정보가 일치하지 않습니다.');
+                    customAlert('이름 또는 학번 정보가 일치하지 않습니다.');
                 }
             });
         }
 
         function logout() {
             if (currentUser) {
-                db.ref('notifications/' + currentUser.studentId).off(); // 로그아웃 시 리스너 해제
+                db.ref('notifications/' + currentUser.studentId).off(); 
             }
             currentUser = null;
             localStorage.removeItem('studycafe_user');
             renderAuthHeader();
         }
 
-        // Admin Log & Force Checkout Functions
         function openAdminModal() {
             openModal('adminModal');
+            document.getElementById('adminAuthBox').classList.remove('hidden');
+            document.getElementById('adminContent').classList.add('hidden');
+            document.getElementById('adminPw').value = '';
         }
 
         function verifyAdmin() {
@@ -591,7 +683,7 @@
                 loadAdminActiveSeats();
                 loadLogs();
             } else {
-                alert('비밀번호가 올바르지 않습니다.');
+                customAlert('비밀번호가 올바르지 않습니다.');
             }
         }
 
@@ -609,8 +701,8 @@
                         if (seat.status === 'OCCUPIED' || seat.status === 'BREAK') {
                             hasActiveSeats = true;
                             const statusBadge = seat.status === 'OCCUPIED' ? 
-                                '<span class="text-indigo-600 font-bold">이용중</span>' : 
-                                '<span class="text-amber-500 font-bold">외출중</span>';
+                                '<span class="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded font-bold">이용중</span>' : 
+                                '<span class="bg-amber-100 text-amber-700 px-2 py-0.5 rounded font-bold">외출중</span>';
                             
                             const tr = document.createElement('tr');
                             tr.innerHTML = `
@@ -618,7 +710,7 @@
                                 <td class="p-2.5">${statusBadge}</td>
                                 <td class="p-2.5 font-medium">${seat.userName} (${seat.studentId})</td>
                                 <td class="p-2.5 text-center">
-                                    <button onclick="adminForceCheckOut(${seat.id})" class="px-2.5 py-1 bg-rose-500 hover:bg-rose-600 text-white rounded text-[10px] font-bold transition">강제퇴실</button>
+                                    <button onclick="adminForceCheckOut(${seat.id})" class="px-2.5 py-1 bg-rose-500 hover:bg-rose-600 text-white rounded text-[10px] font-bold shadow-sm transition">강제퇴실</button>
                                 </td>
                             `;
                             tbody.appendChild(tr);
@@ -633,7 +725,7 @@
         }
 
         function adminForceCheckOut(seatId) {
-            if (confirm(`[관리자 권한] ${seatId}번 좌석을 강제 퇴실 처리하시겠습니까?`)) {
+            customConfirm(`[관리자 권한]\n${seatId}번 좌석을 강제 퇴실 처리하시겠습니까?`, () => {
                 db.ref('seats/' + seatId).once('value', snapshot => {
                     const seat = snapshot.val();
                     if (seat && (seat.status === 'OCCUPIED' || seat.status === 'BREAK')) {
@@ -647,9 +739,9 @@
                             time: Date.now()
                         });
 
-                        // 해당 사용자의 DB 경로에 알림 푸시 (클라이언트가 실시간으로 감지)
+                        // 해당 사용자의 DB 경로에 강제 퇴실 알림 푸시 (실시간 팝업 트리거 됨)
                         db.ref('notifications/' + seat.studentId).push({
-                            message: `[관리자 알림] ${seatId}번 좌석에서 이용 시간이 초과되었거나 관리자에 의해 강제 퇴실 처리되었습니다.`
+                            message: `🚨 [관리자 알림]\n오랜 시간 자리를 비워서 ${seatId}번 좌석에서 강제 퇴실 처리되었습니다.\n\n짐을 신속히 정리해 주시기 바랍니다.`
                         });
 
                         // 좌석 초기화
@@ -664,10 +756,10 @@
                             lastUser: { userName: seat.userName, studentId: seat.studentId, checkOutTime: Date.now() }
                         });
 
-                        alert(`${seatId}번 좌석이 강제 퇴실 처리되었습니다.`);
+                        customAlert(`${seatId}번 좌석이 강제 퇴실 처리되었습니다.`);
                     }
                 });
-            }
+            });
         }
 
         function loadLogs() {
@@ -703,22 +795,21 @@
         }
 
         function clearLogs() {
-            if (confirm("모든 기록을 삭제하시겠습니까?")) {
+            customConfirm("모든 로그 기록을 삭제하시겠습니까?", () => {
                 db.ref('logs').remove();
-            }
+            });
         }
 
-        // UI Helpers
         function renderAuthHeader() {
             const container = document.getElementById('authHeader');
             if (currentUser) {
                 container.innerHTML = `
                     <span class="text-indigo-200"><strong class="text-white">${currentUser.name}</strong> (${maskId(currentUser.studentId)})님</span>
-                    <button onclick="logout()" class="px-3 py-1 bg-indigo-800 hover:bg-indigo-700 text-xs text-indigo-200 rounded-lg">로그아웃</button>
+                    <button onclick="logout()" class="px-3 py-1 bg-indigo-800 hover:bg-rose-600 text-xs text-white rounded-lg transition shadow">로그아웃</button>
                 `;
             } else {
                 container.innerHTML = `
-                    <button onclick="openModal('authModal')" class="px-3 py-1 bg-amber-400 hover:bg-amber-300 text-indigo-950 font-bold text-xs rounded-lg">로그인 / 회원가입</button>
+                    <button onclick="openModal('authModal')" class="px-4 py-1.5 bg-amber-400 hover:bg-amber-300 text-indigo-950 font-bold text-xs rounded-lg shadow-sm transition">로그인 / 회원가입</button>
                 `;
             }
         }
@@ -736,12 +827,12 @@
                 document.getElementById('loginForm').classList.remove('hidden');
                 document.getElementById('registerForm').classList.add('hidden');
                 document.getElementById('tabLogin').className = "flex-1 py-3 text-center font-bold border-b-2 border-indigo-600 text-indigo-600";
-                document.getElementById('tabRegister').className = "flex-1 py-3 text-center font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-600";
+                document.getElementById('tabRegister').className = "flex-1 py-3 text-center font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-600 transition";
             } else {
                 document.getElementById('loginForm').classList.add('hidden');
                 document.getElementById('registerForm').classList.remove('hidden');
                 document.getElementById('tabRegister').className = "flex-1 py-3 text-center font-bold border-b-2 border-emerald-600 text-emerald-600";
-                document.getElementById('tabLogin').className = "flex-1 py-3 text-center font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-600";
+                document.getElementById('tabLogin').className = "flex-1 py-3 text-center font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-600 transition";
             }
         }
 
