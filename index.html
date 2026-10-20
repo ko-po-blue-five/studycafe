@@ -317,6 +317,7 @@
             });
         }
 
+        // 트랜잭션을 적용하여 다중 클릭 및 동시 예약을 완벽하게 차단하는 함수
         function handleSeatClick(seatId) {
             if (!currentUser) {
                 alert("로그인이 필요한 서비스입니다.");
@@ -324,42 +325,60 @@
                 return;
             }
 
-            // 전체 좌석 정보를 한 번 불러와서 검사
-            db.ref('seats').once('value', (snapshot) => {
-                const seats = snapshot.val();
-                if (!seats) return;
-
-                // 1. 선택한 좌석이 그사이 다른 사람에 의해 예약되었는지 확인 (동시 접속 방어)
-                if (seats[seatId].status !== 'AVAILABLE') {
-                    alert("이미 이용 중인 좌석입니다.");
-                    return;
-                }
-
-                // 2. 현재 사용자가 이미 이용 중인 좌석이 있는지 확인 (1인 1좌석 검사)
-                let alreadyHasSeat = false;
-                let occupiedSeatId = null;
-
-                Object.values(seats).forEach(seat => {
-                    if ((seat.status === 'OCCUPIED' || seat.status === 'BREAK') && seat.studentId === currentUser.studentId) {
-                        alreadyHasSeat = true;
-                        occupiedSeatId = seat.id;
+            db.ref('seats').transaction((seats) => {
+                if (seats) {
+                    // 1. 선택한 좌석이 아직 비어있는지 확인
+                    if (seats[seatId].status !== 'AVAILABLE') {
+                        return; // 예약 불가 (트랜잭션 취소)
                     }
-                });
 
-                if (alreadyHasSeat) {
-                    alert(`이미 ${occupiedSeatId}번 좌석을 이용 중입니다.\n1인당 1개의 좌석만 이용할 수 있습니다.`);
-                    return; // 예약 중단
+                    // 2. 현재 로그인한 학번이 이미 차지한 좌석이 있는지 엄격하게 검사
+                    let alreadyHasSeat = false;
+                    Object.values(seats).forEach(seat => {
+                        // String()으로 감싸서 숫자/문자열 타입 차이로 인한 검사 누락 방지
+                        if ((seat.status === 'OCCUPIED' || seat.status === 'BREAK') && 
+                            String(seat.studentId) === String(currentUser.studentId)) {
+                            alreadyHasSeat = true;
+                        }
+                    });
+
+                    // 이미 예약한 자리가 있다면 데이터 변경 없이 트랜잭션 취소
+                    if (alreadyHasSeat) {
+                        return; 
+                    }
+
+                    // 3. 1인 1좌석 조건을 통과했다면 상태 업데이트
+                    seats[seatId].status = 'OCCUPIED';
+                    seats[seatId].userName = currentUser.name;
+                    seats[seatId].studentId = currentUser.studentId;
+                    seats[seatId].checkInTime = Date.now();
+                    seats[seatId].breakStartTime = null;
+                    seats[seatId].breakDurationMinutes = 30;
+                    
+                    return seats; // 변경된 상태를 DB에 안전하게 저장
                 }
+                return seats;
+            }, (error, committed, snapshot) => {
+                if (error) {
+                    alert("예약 처리 중 통신 오류가 발생했습니다.");
+                } else if (!committed) {
+                    // 예약이 반려(취소)된 경우, 사유를 파악하여 정확한 안내 메시지 출력
+                    const currentSeats = snapshot.val();
+                    let occupiedSeatId = null;
+                    
+                    Object.values(currentSeats).forEach(seat => {
+                        if ((seat.status === 'OCCUPIED' || seat.status === 'BREAK') && 
+                            String(seat.studentId) === String(currentUser.studentId)) {
+                            occupiedSeatId = seat.id;
+                        }
+                    });
 
-                // 3. 검사를 모두 통과했다면 입실 처리
-                db.ref('seats/' + seatId).update({
-                    status: 'OCCUPIED',
-                    userName: currentUser.name,
-                    studentId: currentUser.studentId,
-                    checkInTime: Date.now(),
-                    breakStartTime: null,
-                    breakDurationMinutes: 30
-                });
+                    if (occupiedSeatId) {
+                        alert(`❌ 이미 ${occupiedSeatId}번 좌석을 이용 중입니다!\n(1인당 1개의 좌석만 예약할 수 있습니다)`);
+                    } else {
+                        alert("❌ 이미 다른 이용자가 예약한 좌석입니다.");
+                    }
+                }
             });
         }
 
@@ -447,203 +466,4 @@
                 if (!seats) return;
 
                 const now = Date.now();
-                Object.values(seats).forEach(seat => {
-                    if (seat.status === 'BREAK' && seat.breakStartTime) {
-                        const elapsedMs = now - seat.breakStartTime;
-                        const allowedMs = seat.breakDurationMinutes * 60 * 1000;
-                        const remainingMs = allowedMs - elapsedMs;
-
-                        const timerElem = document.getElementById(`breakTimer-${seat.id}`);
-                        if (remainingMs <= 0) {
-                            db.ref('logs').push({
-                                type: 'AUTO_EXIT',
-                                seatId: seat.id,
-                                userName: seat.userName,
-                                studentId: seat.studentId,
-                                time: Date.now()
-                            });
-
-                            db.ref('seats/' + seat.id).set({
-                                id: seat.id,
-                                status: 'AVAILABLE',
-                                userName: null,
-                                studentId: null,
-                                checkInTime: null,
-                                breakStartTime: null,
-                                breakDurationMinutes: 30,
-                                lastUser: { userName: seat.userName, studentId: seat.studentId, checkOutTime: Date.now() }
-                            });
-                        } else if (timerElem) {
-                            const min = Math.floor(remainingMs / 60000);
-                            const sec = Math.floor((remainingMs % 60000) / 1000);
-                            timerElem.innerText = `남은시간: ${min}분 ${sec}초`;
-                        }
-                    }
-                });
-            });
-        }
-
-        // 로그인 10분 만료 검사 함수
-        function checkAuthTimeout() {
-            if (currentUser && currentUser.expireTime) {
-                if (Date.now() > currentUser.expireTime) {
-                    logout();
-                    alert("로그인 유효시간(10분)이 만료되어 자동 로그아웃되었습니다.");
-                }
-            }
-        }
-
-        // Auth Operations
-        function handleRegister(e) {
-            e.preventDefault();
-            const name = document.getElementById('regName').value.trim();
-            const studentId = document.getElementById('regStudentId').value.trim();
-
-            if (studentId.length !== 10 || isNaN(studentId)) {
-                alert('학번은 숫자 10자리로 입력해 주세요.');
-                return;
-            }
-
-            db.ref('users/' + studentId).once('value', (snapshot) => {
-                if (snapshot.exists()) {
-                    alert('이미 등록된 학번입니다. 로그인해 주세요.');
-                } else {
-                    db.ref('users/' + studentId).set({ name, studentId });
-                    
-                    // 10분 만료시간 계산
-                    const expireTime = Date.now() + (10 * 60 * 1000);
-                    currentUser = { name, studentId, expireTime };
-                    localStorage.setItem('studycafe_user', JSON.stringify(currentUser));
-                    
-                    closeModal('authModal');
-                    renderAuthHeader();
-                    alert('회원가입이 완료되었습니다!');
-                }
-            });
-        }
-
-        function handleLogin(e) {
-            e.preventDefault();
-            const name = document.getElementById('loginName').value.trim();
-            const studentId = document.getElementById('loginStudentId').value.trim();
-
-            db.ref('users/' + studentId).once('value', (snapshot) => {
-                const userData = snapshot.val();
-                if (userData && userData.name === name) {
-                    // 10분 만료시간 계산
-                    const expireTime = Date.now() + (10 * 60 * 1000);
-                    currentUser = { name, studentId, expireTime };
-                    localStorage.setItem('studycafe_user', JSON.stringify(currentUser));
-                    
-                    closeModal('authModal');
-                    renderAuthHeader();
-                } else {
-                    alert('이름 또는 학번 정보가 일치하지 않습니다.');
-                }
-            });
-        }
-
-        function logout() {
-            currentUser = null;
-            localStorage.removeItem('studycafe_user');
-            renderAuthHeader();
-        }
-
-        // Admin Log Functions
-        function openAdminModal() {
-            openModal('adminModal');
-        }
-
-        function verifyAdmin() {
-            const pw = document.getElementById('adminPw').value;
-            if (pw === '1234') { // 관리자 비밀번호
-                document.getElementById('adminAuthBox').classList.add('hidden');
-                document.getElementById('adminContent').classList.remove('hidden');
-                loadLogs();
-            } else {
-                alert('비밀번호가 올바르지 않습니다.');
-            }
-        }
-
-        function loadLogs() {
-            db.ref('logs').limitToLast(30).on('value', (snapshot) => {
-                const logs = snapshot.val();
-                const tbody = document.getElementById('logTableBody');
-                tbody.innerHTML = '';
-
-                if (!logs) {
-                    tbody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-slate-400">기록이 없습니다.</td></tr>`;
-                    return;
-                }
-
-                Object.values(logs).reverse().forEach(log => {
-                    const tr = document.createElement('tr');
-                    let typeBadge = '';
-                    if (log.type === 'EXIT') typeBadge = `<span class="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-bold">퇴실</span>`;
-                    else if (log.type === 'REPORT') typeBadge = `<span class="bg-rose-100 text-rose-600 px-1.5 py-0.5 rounded font-bold">⚠️ 불청결신고</span>`;
-                    else if (log.type === 'AUTO_EXIT') typeBadge = `<span class="bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded font-bold">자동퇴실</span>`;
-
-                    const dateStr = new Date(log.time).toLocaleString([], {month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'});
-
-                    tr.innerHTML = `
-                        <td class="p-2.5">${typeBadge}</td>
-                        <td class="p-2.5 font-bold">${log.seatId}번</td>
-                        <td class="p-2.5 font-medium">${log.userName} (${log.studentId}) ${log.reporterName ? `<br><span class="text-[10px] text-rose-500">(신고자: ${log.reporterName})</span>` : ''}</td>
-                        <td class="p-2.5 text-slate-400">${dateStr}</td>
-                    `;
-                    tbody.appendChild(tr);
-                });
-            });
-        }
-
-        function clearLogs() {
-            if (confirm("모든 기록을 삭제하시겠습니까?")) {
-                db.ref('logs').remove();
-            }
-        }
-
-        // UI Helpers
-        function renderAuthHeader() {
-            const container = document.getElementById('authHeader');
-            if (currentUser) {
-                container.innerHTML = `
-                    <span class="text-indigo-200"><strong class="text-white">${currentUser.name}</strong> (${maskId(currentUser.studentId)})님</span>
-                    <button onclick="logout()" class="px-3 py-1 bg-indigo-800 hover:bg-indigo-700 text-xs text-indigo-200 rounded-lg">로그아웃</button>
-                `;
-            } else {
-                container.innerHTML = `
-                    <button onclick="openModal('authModal')" class="px-3 py-1 bg-amber-400 hover:bg-amber-300 text-indigo-950 font-bold text-xs rounded-lg">로그인 / 회원가입</button>
-                `;
-            }
-        }
-
-        function updateStats(seats) {
-            const list = Object.values(seats);
-            document.getElementById('statTotal').innerText = list.length;
-            document.getElementById('statAvailable').innerText = list.filter(s => s.status === 'AVAILABLE').length;
-            document.getElementById('statOccupied').innerText = list.filter(s => s.status === 'OCCUPIED').length;
-            document.getElementById('statBreak').innerText = list.filter(s => s.status === 'BREAK').length;
-        }
-
-        function switchAuthTab(tab) {
-            if (tab === 'login') {
-                document.getElementById('loginForm').classList.remove('hidden');
-                document.getElementById('registerForm').classList.add('hidden');
-                document.getElementById('tabLogin').className = "flex-1 py-3 text-center font-bold border-b-2 border-indigo-600 text-indigo-600";
-                document.getElementById('tabRegister').className = "flex-1 py-3 text-center font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-600";
-            } else {
-                document.getElementById('loginForm').classList.add('hidden');
-                document.getElementById('registerForm').classList.remove('hidden');
-                document.getElementById('tabRegister').className = "flex-1 py-3 text-center font-bold border-b-2 border-emerald-600 text-emerald-600";
-                document.getElementById('tabLogin').className = "flex-1 py-3 text-center font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-600";
-            }
-        }
-
-        function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
-        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
-
-        function maskName(name) { return name ? name[0] + "*" + (name.length > 2 ? name[name.length-1] : "") : ""; }
-        function maskId(id) { return id ? id.substring(0, 4) + "******" : ""; }
-    </script>
-</body>
-</html>
+                Object.values(seats).forEach(seat =>
