@@ -240,9 +240,22 @@
             initSeatsInDB();
             renderAuthHeader();
             listenToDB();
+            listenToNotifications(); // 추가: 알림 감지 리스너 실행
             setInterval(checkAllBreakTimers, 1000);
             setInterval(checkAuthTimeout, 1000);
         });
+
+        // 사용자별 개별 알림을 감지하는 함수
+        function listenToNotifications() {
+            if (!currentUser) return;
+            db.ref('notifications/' + currentUser.studentId).on('child_added', (snapshot) => {
+                const notif = snapshot.val();
+                if (notif && notif.message) {
+                    alert(notif.message);
+                    snapshot.ref.remove(); // 알림 확인 후 즉시 DB에서 삭제하여 반복 방지
+                }
+            });
+        }
 
         function initSeatsInDB() {
             db.ref('seats').once('value', (snapshot) => {
@@ -529,6 +542,7 @@
                     
                     closeModal('authModal');
                     renderAuthHeader();
+                    listenToNotifications(); // 로그인 성공 시 알림 리스너 시작
                     alert('회원가입이 완료되었습니다!');
                 }
             });
@@ -548,6 +562,7 @@
                     
                     closeModal('authModal');
                     renderAuthHeader();
+                    listenToNotifications(); // 로그인 성공 시 알림 리스너 시작
                 } else {
                     alert('이름 또는 학번 정보가 일치하지 않습니다.');
                 }
@@ -555,6 +570,9 @@
         }
 
         function logout() {
+            if (currentUser) {
+                db.ref('notifications/' + currentUser.studentId).off(); // 로그아웃 시 리스너 해제
+            }
             currentUser = null;
             localStorage.removeItem('studycafe_user');
             renderAuthHeader();
@@ -627,6 +645,11 @@
                             studentId: seat.studentId,
                             reporterName: '관리자',
                             time: Date.now()
+                        });
+
+                        // 해당 사용자의 DB 경로에 알림 푸시 (클라이언트가 실시간으로 감지)
+                        db.ref('notifications/' + seat.studentId).push({
+                            message: `[관리자 알림] ${seatId}번 좌석에서 이용 시간이 초과되었거나 관리자에 의해 강제 퇴실 처리되었습니다.`
                         });
 
                         // 좌석 초기화
