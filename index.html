@@ -161,7 +161,7 @@
             <div id="adminAuthBox" class="space-y-3 py-4">
                 <p class="text-xs text-slate-500">관리자 전용 비밀번호를 입력해 주세요.</p>
                 <div class="flex gap-2">
-                    <input type="password" id="adminPw" placeholder="비밀번호 입력" class="flex-1 px-3 py-2 border rounded-lg text-sm">
+                    <input type="password" id="adminPw" placeholder="비밀번호를 입력하세요" class="flex-1 px-3 py-2 border rounded-lg text-sm">
                     <button onclick="verifyAdmin()" class="px-4 py-2 bg-indigo-600 text-white font-bold rounded-lg text-sm transition">확인</button>
                 </div>
             </div>
@@ -264,6 +264,16 @@
         let promptCallback = null;
 
         function customAlert(message) {
+            const iconElem = document.getElementById('customAlertIcon');
+            // 강제퇴실 등 강력한 경고 알림일 경우 붉은색 경고 아이콘으로 변경 및 강조
+            if (message.includes('🚨') || message.includes('경고')) {
+                iconElem.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>';
+                iconElem.className = 'text-5xl text-rose-500 mb-3 animate-bounce';
+            } else {
+                iconElem.innerHTML = '<i class="fa-solid fa-bell"></i>';
+                iconElem.className = 'text-5xl text-indigo-500 mb-3';
+            }
+            
             document.getElementById('customAlertMessage').innerText = message;
             document.getElementById('customAlertModal').classList.remove('hidden');
         }
@@ -739,9 +749,9 @@
                             time: Date.now()
                         });
 
-                        // 해당 사용자의 DB 경로에 강제 퇴실 알림 푸시 (실시간 팝업 트리거 됨)
+                        // 해당 사용자의 DB 경로에 강제 퇴실 알림 푸시 (실시간으로 대상자 화면에 즉시 팝업 트리거 됨)
                         db.ref('notifications/' + seat.studentId).push({
-                            message: `🚨 [관리자 알림]\n오랜 시간 자리를 비워서 ${seatId}번 좌석에서 강제 퇴실 처리되었습니다.\n\n짐을 신속히 정리해 주시기 바랍니다.`
+                            message: `🚨 [관리자 알림]\n오랜 시간 자리를 비워서 ${seatId}번 좌석에서 강제퇴실 되었습니다.\n\n짐을 신속히 정리해 주시기 바랍니다.`
                         });
 
                         // 좌석 초기화
