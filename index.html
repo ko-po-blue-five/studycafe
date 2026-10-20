@@ -151,9 +151,9 @@
 
     <!-- Modal: Admin Logs -->
     <div id="adminModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
-        <div class="bg-white rounded-2xl shadow-xl max-w-2xl w-full p-6 space-y-4 max-h-[85vh] flex flex-col">
+        <div class="bg-white rounded-2xl shadow-xl max-w-2xl w-full p-6 space-y-4 max-h-[90vh] flex flex-col">
             <div class="flex justify-between items-center border-b pb-3">
-                <h3 class="text-lg font-bold text-slate-800"><i class="fa-solid fa-clipboard-list text-indigo-600"></i> 좌석 이용 및 신고 기록</h3>
+                <h3 class="text-lg font-bold text-slate-800"><i class="fa-solid fa-user-shield text-indigo-600"></i> 스터디 카페 관리자 모드</h3>
                 <button onclick="closeModal('adminModal')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-xl"></i></button>
             </div>
 
@@ -166,26 +166,52 @@
                 </div>
             </div>
 
-            <!-- Log Table -->
-            <div id="adminContent" class="hidden flex-1 overflow-y-auto space-y-4">
-                <div class="flex justify-between items-center text-xs font-bold text-slate-500">
-                    <span>최근 퇴실 및 신고 기록</span>
-                    <button onclick="clearLogs()" class="text-rose-500 hover:underline">기록 전체 삭제</button>
+            <!-- Admin Content Area (Hidden until authenticated) -->
+            <div id="adminContent" class="hidden flex-1 overflow-y-auto space-y-6">
+                
+                <!-- Section 1: Active Seats Management (Force Checkout) -->
+                <div>
+                    <h4 class="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+                        <i class="fa-solid fa-list-check text-indigo-500"></i> 현재 이용중인 좌석 관리
+                    </h4>
+                    <div class="border rounded-xl overflow-hidden max-h-48 overflow-y-auto">
+                        <table class="w-full text-xs text-left">
+                            <thead class="bg-indigo-50 text-indigo-800 font-bold border-b sticky top-0 z-10">
+                                <tr>
+                                    <th class="p-2.5">좌석</th>
+                                    <th class="p-2.5">상태</th>
+                                    <th class="p-2.5">이용자(학번)</th>
+                                    <th class="p-2.5 text-center">관리</th>
+                                </tr>
+                            </thead>
+                            <tbody id="adminActiveSeatsTable" class="divide-y divide-slate-100 bg-white">
+                                <!-- Dynamic Active Seats -->
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-                <div class="border rounded-xl overflow-hidden">
-                    <table class="w-full text-xs text-left">
-                        <thead class="bg-slate-100 text-slate-600 font-bold border-b">
-                            <tr>
-                                <th class="p-2.5">유형</th>
-                                <th class="p-2.5">좌석</th>
-                                <th class="p-2.5">이용자(학번)</th>
-                                <th class="p-2.5">시간</th>
-                            </tr>
-                        </thead>
-                        <tbody id="logTableBody" class="divide-y divide-slate-100">
-                            <!-- Dynamic Logs -->
-                        </tbody>
-                    </table>
+
+                <!-- Section 2: Logs -->
+                <div>
+                    <div class="flex justify-between items-center text-sm font-bold text-slate-700 mb-2">
+                        <span class="flex items-center gap-2"><i class="fa-solid fa-clock-rotate-left text-indigo-500"></i> 최근 퇴실 및 신고 기록</span>
+                        <button onclick="clearLogs()" class="text-rose-500 hover:underline text-xs font-normal">기록 전체 삭제</button>
+                    </div>
+                    <div class="border rounded-xl overflow-hidden max-h-64 overflow-y-auto">
+                        <table class="w-full text-xs text-left">
+                            <thead class="bg-slate-100 text-slate-600 font-bold border-b sticky top-0 z-10">
+                                <tr>
+                                    <th class="p-2.5">유형</th>
+                                    <th class="p-2.5">좌석</th>
+                                    <th class="p-2.5">이용자(학번)</th>
+                                    <th class="p-2.5">시간</th>
+                                </tr>
+                            </thead>
+                            <tbody id="logTableBody" class="divide-y divide-slate-100">
+                                <!-- Dynamic Logs -->
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -210,12 +236,12 @@
         const TOTAL_SEATS = 12;
 
         document.addEventListener("DOMContentLoaded", () => {
-            checkAuthTimeout(); // 로드 시 10분 만료 여부 검사
+            checkAuthTimeout();
             initSeatsInDB();
             renderAuthHeader();
             listenToDB();
             setInterval(checkAllBreakTimers, 1000);
-            setInterval(checkAuthTimeout, 1000); // 1초마다 로그인 10분 만료 감시
+            setInterval(checkAuthTimeout, 1000);
         });
 
         function initSeatsInDB() {
@@ -317,7 +343,6 @@
             });
         }
 
-        // 중복 좌석 예약 방지 로직이 반영된 handleSeatClick
         function handleSeatClick(seatId) {
             if (!currentUser) {
                 alert("로그인이 필요한 서비스입니다.");
@@ -473,7 +498,6 @@
             });
         }
 
-        // 로그인 10분 만료 검사 함수
         function checkAuthTimeout() {
             if (currentUser && currentUser.expireTime) {
                 if (Date.now() > currentUser.expireTime) {
@@ -483,7 +507,6 @@
             }
         }
 
-        // Auth Operations
         function handleRegister(e) {
             e.preventDefault();
             const name = document.getElementById('regName').value.trim();
@@ -537,7 +560,7 @@
             renderAuthHeader();
         }
 
-        // Admin Log Functions
+        // Admin Log & Force Checkout Functions
         function openAdminModal() {
             openModal('adminModal');
         }
@@ -547,14 +570,85 @@
             if (pw === '1234') { // 관리자 비밀번호
                 document.getElementById('adminAuthBox').classList.add('hidden');
                 document.getElementById('adminContent').classList.remove('hidden');
+                loadAdminActiveSeats();
                 loadLogs();
             } else {
                 alert('비밀번호가 올바르지 않습니다.');
             }
         }
 
+        function loadAdminActiveSeats() {
+            db.ref('seats').on('value', (snapshot) => {
+                const seats = snapshot.val();
+                const tbody = document.getElementById('adminActiveSeatsTable');
+                if(!tbody) return;
+                tbody.innerHTML = '';
+                
+                let hasActiveSeats = false;
+
+                if (seats) {
+                    Object.values(seats).forEach(seat => {
+                        if (seat.status === 'OCCUPIED' || seat.status === 'BREAK') {
+                            hasActiveSeats = true;
+                            const statusBadge = seat.status === 'OCCUPIED' ? 
+                                '<span class="text-indigo-600 font-bold">이용중</span>' : 
+                                '<span class="text-amber-500 font-bold">외출중</span>';
+                            
+                            const tr = document.createElement('tr');
+                            tr.innerHTML = `
+                                <td class="p-2.5 font-bold text-slate-700">${seat.id}번</td>
+                                <td class="p-2.5">${statusBadge}</td>
+                                <td class="p-2.5 font-medium">${seat.userName} (${seat.studentId})</td>
+                                <td class="p-2.5 text-center">
+                                    <button onclick="adminForceCheckOut(${seat.id})" class="px-2.5 py-1 bg-rose-500 hover:bg-rose-600 text-white rounded text-[10px] font-bold transition">강제퇴실</button>
+                                </td>
+                            `;
+                            tbody.appendChild(tr);
+                        }
+                    });
+                }
+                
+                if (!hasActiveSeats) {
+                    tbody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-slate-400 text-xs">현재 이용중이거나 외출중인 좌석이 없습니다.</td></tr>`;
+                }
+            });
+        }
+
+        function adminForceCheckOut(seatId) {
+            if (confirm(`[관리자 권한] ${seatId}번 좌석을 강제 퇴실 처리하시겠습니까?`)) {
+                db.ref('seats/' + seatId).once('value', snapshot => {
+                    const seat = snapshot.val();
+                    if (seat && (seat.status === 'OCCUPIED' || seat.status === 'BREAK')) {
+                        // 관리자 강제 퇴실 로그 기록
+                        db.ref('logs').push({
+                            type: 'FORCE_EXIT',
+                            seatId: seat.id,
+                            userName: seat.userName,
+                            studentId: seat.studentId,
+                            reporterName: '관리자',
+                            time: Date.now()
+                        });
+
+                        // 좌석 초기화
+                        db.ref('seats/' + seatId).set({
+                            id: seatId,
+                            status: 'AVAILABLE',
+                            userName: null,
+                            studentId: null,
+                            checkInTime: null,
+                            breakStartTime: null,
+                            breakDurationMinutes: 30,
+                            lastUser: { userName: seat.userName, studentId: seat.studentId, checkOutTime: Date.now() }
+                        });
+
+                        alert(`${seatId}번 좌석이 강제 퇴실 처리되었습니다.`);
+                    }
+                });
+            }
+        }
+
         function loadLogs() {
-            db.ref('logs').limitToLast(30).on('value', (snapshot) => {
+            db.ref('logs').limitToLast(50).on('value', (snapshot) => {
                 const logs = snapshot.val();
                 const tbody = document.getElementById('logTableBody');
                 tbody.innerHTML = '';
@@ -570,13 +664,14 @@
                     if (log.type === 'EXIT') typeBadge = `<span class="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-bold">퇴실</span>`;
                     else if (log.type === 'REPORT') typeBadge = `<span class="bg-rose-100 text-rose-600 px-1.5 py-0.5 rounded font-bold">⚠️ 불청결신고</span>`;
                     else if (log.type === 'AUTO_EXIT') typeBadge = `<span class="bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded font-bold">자동퇴실</span>`;
+                    else if (log.type === 'FORCE_EXIT') typeBadge = `<span class="bg-rose-600 text-white px-1.5 py-0.5 rounded font-bold">강제퇴실</span>`;
 
                     const dateStr = new Date(log.time).toLocaleString([], {month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'});
 
                     tr.innerHTML = `
                         <td class="p-2.5">${typeBadge}</td>
                         <td class="p-2.5 font-bold">${log.seatId}번</td>
-                        <td class="p-2.5 font-medium">${log.userName} (${log.studentId}) ${log.reporterName ? `<br><span class="text-[10px] text-rose-500">(신고자: ${log.reporterName})</span>` : ''}</td>
+                        <td class="p-2.5 font-medium">${log.userName} (${log.studentId}) ${log.reporterName ? `<br><span class="text-[10px] text-rose-500">(주체: ${log.reporterName})</span>` : ''}</td>
                         <td class="p-2.5 text-slate-400">${dateStr}</td>
                     `;
                     tbody.appendChild(tr);
